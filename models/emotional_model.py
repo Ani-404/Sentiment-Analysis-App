@@ -1,5 +1,4 @@
 # train_bert_emotion_model
-# train_bert.py
 
 import pandas as pd
 import torch
@@ -81,10 +80,10 @@ def main():
     # --- 4. Fine-Tune the Model ---
     print("Starting model fine-tuning...")
     
-    # --- KEY CHANGE: Define an absolute path to your Desktop ---
-    # This creates a reliable path like 'C:/Users/anime/Desktop/my_saved_model'
-    desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
-    output_dir = os.path.join(desktop_path, "sentiment_model_tiny_ON_DESKTOP")
+    # --- KEY CHANGE: Save the model in the SAME directory as this script ---
+    # This gets the absolute path to the folder containing this script.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(script_dir, "sentiment_model_tiny")
     print(f"Model will be saved to: {output_dir}")
     # --- End of Change ---
 
@@ -127,3 +126,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
