@@ -58,7 +58,7 @@ def main():
     # --- 2. Load Tokenizer and Preprocess Data ---
     print("Loading tokenizer and preprocessing data...")
     
-    model_name = "prajjwal1/bert-tiny"
+    model_name = "distilbert-base-uncased"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def tokenize_function(examples):
@@ -83,13 +83,13 @@ def main():
     # --- KEY CHANGE: Save the model in the SAME directory as this script ---
     # This gets the absolute path to the folder containing this script.
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    output_dir = os.path.join(script_dir, "sentiment_model_tiny")
+    output_dir = os.path.join(script_dir, "sentiment_model_distilbert")
     print(f"Model will be saved to: {output_dir}")
     # --- End of Change ---
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        num_train_epochs=3,
+        num_train_epochs=1,
         per_device_train_batch_size=32,
         logging_steps=50,
     )

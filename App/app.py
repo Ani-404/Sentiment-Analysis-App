@@ -27,7 +27,6 @@ def load_model():
     Uses st.cache_resource to load the model only once.
     """
     try:
-        # --- KEY CHANGE: Build the correct path based on your file structure ---
         # Get the directory of the current script (e.g., .../App/)
         app_dir = os.path.dirname(os.path.abspath(__file__))
         # Go up one level to the main project root (e.g., .../Sentiment-Analysis-App/)
