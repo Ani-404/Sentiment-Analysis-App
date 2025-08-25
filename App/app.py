@@ -8,7 +8,9 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from streamlit_option_menu import option_menu
-import os
+import os # <-- Import the 'os' module
+
+# --- Configuration and Model Loading ---
 
 # Set page configuration
 st.set_page_config(
@@ -25,8 +27,16 @@ def load_model():
     Uses st.cache_resource to load the model only once.
     """
     try:
-        # --- KEY CHANGE: Point to the new tiny model directory ---
-        model_path = "./models/sentiment_model_tiny"
+        # --- KEY CHANGE: Build the correct path based on your file structure ---
+        # Get the directory of the current script (e.g., .../App/)
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        # Go up one level to the main project root (e.g., .../Sentiment-Analysis-App/)
+        project_root = os.path.dirname(app_dir)
+        # Now, join the root path with the 'Models' folder and the model name
+        model_path = os.path.join(project_root, "Models", "sentiment_model_tiny")
+        
+        st.info(f"Attempting to load model from: {model_path}")
+
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         model = AutoModelForSequenceClassification.from_pretrained(model_path)
         return tokenizer, model
@@ -82,7 +92,7 @@ def main():
     """
     The main function that runs the Streamlit application.
     """
-    st.image('https://i.ibb.co/rsbYCsN/senttext-low-resolution-logo-white-on-black-background.png', use_column_width=True)
+    st.image('https://i.ibb.co/rsbYCsN/senttext-low-resolution-logo-white-on-black-background.png', use_container_width=True)
     st.title("SentText Emotion Analyzer")
     st.subheader("Analyze the emotional tone of your text with a fine-tuned BERT model.")
 
@@ -147,4 +157,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
