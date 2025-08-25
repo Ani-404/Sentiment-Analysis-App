@@ -13,7 +13,7 @@ from transformers import (
 from datasets import Dataset
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
-import os # <-- Import the 'os' module to handle file paths
+import os # Import the 'os' module to handle file paths
 
 def compute_metrics(p):
     """
@@ -89,7 +89,7 @@ def main():
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        num_train_epochs=1,
+        num_train_epochs=3,
         per_device_train_batch_size=32,
         logging_steps=50,
     )
