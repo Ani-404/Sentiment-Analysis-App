@@ -21,7 +21,7 @@ wheels/
 *.egg
 
 # Virtual Environment
-sentiment_env/
+sentiment-env/
 venv/
 env/
 ENV/
