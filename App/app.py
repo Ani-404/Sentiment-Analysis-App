@@ -27,12 +27,10 @@ def load_model():
     Uses st.cache_resource to load the model only once.
     """
     try:
-        # Get the directory of the current script (e.g., .../App/)
+        # Build the correct path based on your file structure
         app_dir = os.path.dirname(os.path.abspath(__file__))
-        # Go up one level to the main project root (e.g., .../Sentiment-Analysis-App/)
         project_root = os.path.dirname(app_dir)
-        # Now, join the root path with the 'Models' folder and the model name
-        model_path = os.path.join(project_root, "Models", "sentiment_model_tiny")
+        model_path = os.path.join(project_root, "Models", "sentiment_model_distilbert")
         
         st.info(f"Attempting to load model from: {model_path}")
 
@@ -91,7 +89,10 @@ def main():
     """
     The main function that runs the Streamlit application.
     """
-    st.image('https://i.ibb.co/rsbYCsN/senttext-low-resolution-logo-white-on-black-background.png', use_container_width=True)
+    # --- KEY CHANGE: Reverted to the older 'use_column_width' argument ---
+    st.image('https://i.ibb.co/rsbYCsN/senttext-low-resolution-logo-white-on-black-background.png', use_column_width=True)
+    # --- End of Change ---
+    
     st.title("SentText Emotion Analyzer")
     st.subheader("Analyze the emotional tone of your text with a fine-tuned BERT model.")
 
