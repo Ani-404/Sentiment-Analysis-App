@@ -17,7 +17,7 @@ st.set_page_config(
     page_title="SentText - Emotion Analysis",
     page_icon="🙂",
     layout="centered",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 @st.cache_resource
@@ -152,7 +152,9 @@ def main():
     else: # About page
         st.header("About SentText")
         st.markdown("""
-        This application classifies text into granular emotions like **joy, sadness, anger, fear,** and more using a **Tiny BERT** model that has been fine-tuned on a dataset of emotional texts.
+        This application provides nuanced emotional analysis that goes beyond simple positive or negative sentiment. By classifying text into granular categories such as joy, anger, sadness, and fear - SentText offers a deeper understanding of the underlying tone and intent of a message.
+
+        The analysis is powered by a DistilBERT model, a streamlined and efficient version of the powerful BERT language model. This model has been specifically fine-tuned on a large dataset of emotional texts to accurately identify and differentiate between various human emotions. The result is a tool that provides fast, reliable, and insightful analysis of textual communication.
         """)
 
 if __name__ == '__main__':
