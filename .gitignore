@@ -1,8 +1,12 @@
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
+
+# C extensions
 *.so
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -19,37 +23,58 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual Environment
-sentiment-env/
-venv/
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Environments
+.env
+.venv
 env/
+venv/
 ENV/
+env.bak/
+venv.bak/
+sentiment_env/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Models (large files)
-models/*.pkl
-models/*.pth
-models/*.bin
-*.model
-
-# Data files
-data/*.csv
-data/*.json
-!data/sample_data.csv  # Keep sample data
-
-# IDE
-.vscode/
+# IDE settings
 .idea/
-*.swp
-*.swo
+.vscode/
 
-# OS
-.DS_Store
-Thumbs.db
+# --- Machine Learning Specific ---
+# Trained models
+sentiment_model_tiny/
+sentiment_model_distilbert/
+*.pkl
+*.h5
+*.safetensors
+*.bin
 
-# Logs
-*.log
+# Logs and checkpoints
 logs/
+checkpoint-*/
+
+# Data files (if they are large)
+# *.csv
