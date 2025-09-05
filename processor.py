@@ -45,3 +45,28 @@ def aggregate_vectors_to_features(vectors, model, prefix=''):
     features = {f"{prefix}{model.config.id2label[i]}_mean": mean_sentiments[i] for i in range(len(mean_sentiments))}
     return features
 
+def get_stock_returns(ticker, earnings_date):
+    """Fetches stock prices and calculates 1-day and 5-day returns."""
+    earnings_date = pd.to_datetime(earnings_date)
+    start_date = earnings_date - timedelta(days=1)
+    end_date = earnings_date + timedelta(days=7)
+    
+    stock_data = yf.download(ticker, start=start_date, end=end_date, progress=False)
+    
+    if stock_data.empty: return None
+
+    try:
+        price_on_earnings_date = stock_data.loc[stock_data.index.date == earnings_date.date()]['Adj Close'].iloc[0]
+    except IndexError:
+        try:
+            price_on_earnings_date = stock_data[stock_data.index > earnings_date]['Adj Close'].iloc[0]
+        except IndexError: return None
+
+    try:
+        price_1_day_after = stock_data[stock_data.index > earnings_date]['Adj Close'].iloc[0]
+        price_5_days_after = stock_data[stock_data.index > earnings_date]['Adj Close'].iloc[4]
+        
+        return_1d = (price_1_day_after - price_on_earnings_date) / price_on_earnings_date
+        return_5d = (price_5_days_after - price_on_earnings_date) / price_on_earnings_date
+        return {'return_1d': return_1d, 'return_5d': return_5d}
+    except IndexError: return None
