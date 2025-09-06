@@ -1,4 +1,4 @@
-#train_finbert.py
+# train_finbert.py
 # This script trains a FinBERT model for financial sentiment analysis
 
 import pandas as pd
