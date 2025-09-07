@@ -1,6 +1,8 @@
 # train_finbert.py
 # This script trains a FinBERT model for financial sentiment analysis
 
+print("Starting FinBERT training script...")
+
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
@@ -27,7 +29,7 @@ def main():
     """Main function to fine-tune FinBERT on the emotion dataset."""
     print("Loading and preparing the dataset for FinBERT fine-tuning...")
     
-    data_path = 'Data/emotion_dataset.csv'
+    data_path = r"C:\Users\anime\OneDrive\Desktop\Sentiment-Analysis-App\Data\emotion_dataset.csv"
     try:
         df = pd.read_csv(data_path)
     except FileNotFoundError:
@@ -78,7 +80,7 @@ def main():
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        num_train_epochs=3, 
+        num_train_epochs=1, 
         per_device_train_batch_size=16, 
         per_device_eval_batch_size=16,
         warmup_steps=500,
