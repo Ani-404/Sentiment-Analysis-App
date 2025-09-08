@@ -8,9 +8,11 @@ from datetime import timedelta
 import numpy as np
 import torch
 
+
 def ingest_transcripts(file_path='finance/sample_transcripts_advanced.csv'):
     """Ingests earnings call transcripts from the advanced CSV file."""
     return pd.read_csv(file_path)
+
 
 def preprocess_and_split(transcript_text):
     """Splits raw text into clean, individual sentences."""
@@ -19,6 +21,7 @@ def preprocess_and_split(transcript_text):
     sentences = re.split(r'(?<=[.!?]) +', transcript_text)
     cleaned_sentences = [s.strip() for s in sentences if s.strip()]
     return cleaned_sentences
+
 
 def get_sentiment_vectors(sentences, model, tokenizer):
     """Runs FinBERT on sentences to get full emotion probability vectors."""
@@ -34,6 +37,7 @@ def get_sentiment_vectors(sentences, model, tokenizer):
             vectors.append(probabilities)
     return vectors
 
+
 def aggregate_vectors_to_features(vectors, model, prefix=''):
     """Aggregates sentence vectors into call-level features."""
     if not vectors:
@@ -47,6 +51,7 @@ def aggregate_vectors_to_features(vectors, model, prefix=''):
     # Creating a feature dictionary
     features = {f"{prefix}{model.config.id2label[i]}_mean": mean_sentiments[i] for i in range(len(mean_sentiments))}
     return features
+
 
 def get_stock_returns(ticker, earnings_date):
     """Fetches stock prices and calculates 1-day and 5-day returns."""
