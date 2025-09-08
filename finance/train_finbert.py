@@ -3,8 +3,6 @@
 
 print("Starting FinBERT training script...")
 
-# train_finbert.py
-
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
@@ -19,6 +17,7 @@ from datasets import Dataset
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score
 import os
+
 
 def compute_metrics(p):
     """Computes and returns evaluation metrics."""
