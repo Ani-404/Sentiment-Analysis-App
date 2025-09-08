@@ -29,7 +29,7 @@ def compute_metrics(p):
 
 def main():
     """Main function to load data, fine-tune the FinBERT model, and save it."""
-    # --- 1. Load and Prepare the Dataset ---
+    # 1. Load and Prepare the Dataset
     print("Loading and preparing the dataset...")
     try:
         # Build the correct path to the data file
@@ -58,7 +58,7 @@ def main():
     train_dataset = Dataset.from_pandas(train_df)
     val_dataset = Dataset.from_pandas(val_df)
 
-    # --- 2. Load Tokenizer and Preprocess Data ---
+    # 2. Load Tokenizer and Preprocess Data 
     print("Loading tokenizer and preprocessing data...")
     model_name = "ProsusAI/finbert"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -71,7 +71,7 @@ def main():
     tokenized_train_dataset = train_dataset.map(tokenize_function, batched=True)
     tokenized_val_dataset = val_dataset.map(tokenize_function, batched=True)
 
-    # --- 3. Load and Configure the Model ---
+    # 3. Load and Configure the Model 
     print("Loading pre-trained model...")
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
@@ -81,7 +81,7 @@ def main():
         ignore_mismatched_sizes=True, # The pre-trained model has a different number of labels
     )
 
-    # --- 4. Fine-Tune the Model ---
+    # 4. Fine-Tune the Model
     print("Starting model fine-tuning...")
     output_dir = os.path.join(script_dir, "finbert_emotion_model")
     print(f"Model will be saved to: {output_dir}")
@@ -107,7 +107,7 @@ def main():
 
     trainer.train()
 
-    # --- 5. Save and Verify the Model ---
+    # 5. Save and Verify the Model
     print(f"Training complete. Saving model and tokenizer to '{output_dir}'...")
     trainer.save_model(output_dir)
     tokenizer.save_pretrained(output_dir)
