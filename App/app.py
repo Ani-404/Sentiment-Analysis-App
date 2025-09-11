@@ -8,16 +8,27 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from streamlit_option_menu import option_menu
-import os # <-- Import the 'os' module
+import os
+import plotly.express as px
+
+# This brings in the logic from your new 'finance' directory
+from finance.processor import (
+    ingest_transcripts,
+    preprocess_and_split,
+    get_sentiment_vectors,
+    aggregate_vectors_to_features,
+    get_stock_returns
+)
+from finance.analysis import run_prediction_model
 
 # --- Configuration and Model Loading ---
 
 # Set page configuration
 st.set_page_config(
-    page_title="SentText - Emotion Analysis",
-    page_icon="🙂",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    page_title="SentText - Advanced Analysis",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 @st.cache_resource
