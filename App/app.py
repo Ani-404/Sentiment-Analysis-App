@@ -90,3 +90,38 @@ def main():
         render_financial_analyzer()
     elif choice == "About":
         render_about_page()
+
+# --- Page 1: Original Emotion Analyzer ---
+
+def render_emotion_analyzer():
+    st.title("General Emotion Analyzer")
+    st.subheader("Analyze the emotional tone of any text with a fine-tuned DistilBERT model.")
+
+    if models and models.get('general_model'):
+        with st.form(key='emotion_clf_form'):
+            raw_text = st.text_area("Type your text here...", height=150)
+            submit_text = st.form_submit_button(label='Analyze')
+
+        if submit_text and raw_text.strip():
+            # This section uses the GENERAL model
+            prediction = predict_general_emotions(raw_text, models['general_model'], models['general_tokenizer'])
+            probability = get_general_prediction_proba(raw_text, models['general_model'], models['general_tokenizer'])
+            
+            # (UI code for displaying results - adapted from your original app)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.success("Original Text")
+                st.write(raw_text)
+                st.success("Prediction Probability")
+                labels = list(models['general_model'].config.id2label.values())
+                proba_df = pd.DataFrame(probability, columns=labels)
+                st.write(proba_df.T.rename(columns={0: 'Probability'}))
+            with col2:
+                st.success("Prediction")
+                emotions_emoji_dict = {"anger": "😠", "disgust": "🤮", "fear": "😨", "joy": "😂", "neutral": "😐", "sadness": "😔", "shame": "😳", "surprise": "😮"}
+                emoji_icon = emotions_emoji_dict.get(prediction, "🙂")
+                st.metric(label="Predicted Emotion", value=f"{prediction.capitalize()} {emoji_icon}")
+                st.metric(label="Confidence", value=f"{np.max(probability):.4f}")
+
+    else:
+        st.error("General emotion model not loaded. Check model path and files.")
