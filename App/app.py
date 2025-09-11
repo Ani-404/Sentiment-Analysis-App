@@ -32,26 +32,43 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def load_model():
+def load_models():
     """
-    Loads the fine-tuned model and tokenizer from the local directory.
-    Uses st.cache_resource to load the model only once.
+    Loads both the general emotion model and the fine-tuned financial model.
+    This function will be run only once.
     """
+    models = {}
     try:
-        # Build the correct path based on your file structure
+        # --- Determine Project Root Correctly ---
+        # This handles running the script from 'App/' or the project's root directory
         app_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.dirname(app_dir)
-        model_path = os.path.join(project_root, "Models", "sentiment_model_distilbert")
-        
-        st.info(f"Attempting to load model from: {model_path}")
+        if os.path.basename(app_dir) == 'App':
+            project_root = os.path.dirname(app_dir)
+        else:
+            project_root = app_dir
 
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
-        model = AutoModelForSequenceClassification.from_pretrained(model_path)
-        return tokenizer, model
+        # --- Load General Emotion Model (for the first tab) ---
+        general_model_path = os.path.join(project_root, "Models", "sentiment_model_distilbert")
+        st.info(f"Loading general model from: {general_model_path}")
+        models['general_tokenizer'] = AutoTokenizer.from_pretrained(general_model_path)
+        models['general_model'] = AutoModelForSequenceClassification.from_pretrained(general_model_path)
+        
+        # --- Load Fine-Tuned Financial Model (for the second tab) ---
+        finbert_path = os.path.join(project_root, "finance", "finbert_emotion_model")
+        st.info(f"Loading financial model from: {finbert_path}")
+        if os.path.exists(finbert_path):
+            models['finbert_tokenizer'] = AutoTokenizer.from_pretrained(finbert_path)
+            models['finbert_model'] = AutoModelForSequenceClassification.from_pretrained(finbert_path)
+        else:
+            # Display a warning if the financial model hasn't been trained yet
+            st.sidebar.warning("Fine-tuned FinBERT model not found. Please run `python finance/train_finbert.py` from your project root.")
+            models['finbert_tokenizer'] = None
+            models['finbert_model'] = None
+
     except Exception as e:
-        st.error(f"Error loading the model: {e}")
-        st.error(f"Please make sure the folder '{model_path}' exists and contains the model files.")
-        return None, None
+        st.error(f"Error loading models: {e}")
+        return None
+    return models
 
 # Load the model and tokenizer
 tokenizer, model = load_model()
