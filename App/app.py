@@ -125,3 +125,17 @@ def render_emotion_analyzer():
 
     else:
         st.error("General emotion model not loaded. Check model path and files.")
+
+# Helper functions for the general model
+def predict_general_emotions(docx, model, tokenizer):
+    inputs = tokenizer(docx, return_tensors="pt", padding=True, truncation=True)
+    with torch.no_grad():
+        logits = model(**inputs).logits
+    pred_id = torch.argmax(logits, dim=1).item()
+    return model.config.id2label[pred_id]
+
+def get_general_prediction_proba(docx, model, tokenizer):
+    inputs = tokenizer(docx, return_tensors="pt", padding=True, truncation=True)
+    with torch.no_grad():
+        logits = model(**inputs).logits
+    return torch.nn.functional.softmax(logits, dim=1).numpy()
