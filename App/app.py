@@ -219,3 +219,5 @@ def render_financial_analyzer():
         st.info(message)
         st.subheader("Top 10 Most Predictive Features")
         st.bar_chart(model_results['feature_importance'].head(10))
+
+# --- Page 3: About Page ---
