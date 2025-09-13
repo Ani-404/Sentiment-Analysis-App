@@ -139,3 +139,83 @@ def get_general_prediction_proba(docx, model, tokenizer):
     with torch.no_grad():
         logits = model(**inputs).logits
     return torch.nn.functional.softmax(logits, dim=1).numpy()
+
+# --- Page 2: New Financial Analyzer ---
+
+@st.cache_data
+def run_full_finance_pipeline():
+    """Caches the full financial data processing and modeling pipeline."""
+    if not models or not models.get('finbert_model'):
+        return None, None, None, "Fine-tuned FinBERT model not available. Please run the training script."
+
+    finbert_model = models['finbert_model']
+    finbert_tokenizer = models['finbert_tokenizer']
+    
+    df_transcripts = ingest_transcripts()
+    all_features = []
+
+    for _, row in df_transcripts.iterrows():
+        remarks_sentences = preprocess_and_split(row['prepared_remarks'])
+        remarks_vectors = get_sentiment_vectors(remarks_sentences, finbert_model, finbert_tokenizer)
+        remarks_features = aggregate_vectors_to_features(remarks_vectors, finbert_model, prefix='remarks_')
+
+        qa_sentences = preprocess_and_split(row['analyst_qa'])
+        qa_vectors = get_sentiment_vectors(qa_sentences, finbert_model, finbert_tokenizer)
+        qa_features = aggregate_vectors_to_features(qa_vectors, finbert_model, prefix='qa_')
+        
+        combined_features = {**remarks_features, **qa_features}
+        returns = get_stock_returns(row['ticker'], row['earnings_date'])
+        
+        if returns:
+            full_feature_row = {**combined_features, **returns, 'ticker': row['ticker'], 'company_name': row['company_name']}
+            all_features.append(full_feature_row)
+
+    if not all_features:
+        return df_transcripts, None, None, "Could not process transcripts or fetch stock data."
+
+    features_df = pd.DataFrame(all_features)
+    model_results, message = run_prediction_model(features_df.dropna())
+    return df_transcripts, features_df.dropna(), model_results, message
+
+
+def render_financial_analyzer():
+    st.title("Advanced Earnings Call Analysis")
+    st.subheader("Predicting Stock Returns with FinBERT-powered Sentiment Analysis")
+
+    df_transcripts, features_df, model_results, message = run_full_finance_pipeline()
+
+    if features_df is None:
+        st.error(message)
+        return
+
+    st.header("Company Analysis Dashboard")
+    company = st.selectbox("Select Company", options=df_transcripts['company_name'].unique())
+    
+    selected_features = features_df[features_df['company_name'] == company].iloc[0]
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("1-Day Post-Earnings Return", f"{selected_features['return_1d']:.2%}")
+    col2.metric("5-Day Post-Earnings Return", f"{selected_features['return_5d']:.2%}")
+    if model_results:
+        col3.metric("Model MSE on Test Set", f"{model_results['mse']:.6f}")
+
+
+    st.subheader("Sentiment Analysis Breakdown")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("##### Prepared Remarks Sentiment")
+        remarks_cols = {k.replace('remarks_', '').replace('_mean','').capitalize():v for k,v in selected_features.items() if 'remarks' in k}
+        remarks_df = pd.DataFrame.from_dict(remarks_cols, orient='index', columns=['Mean Score'])
+        st.bar_chart(remarks_df)
+
+    with col2:
+        st.markdown("##### Analyst Q&A Sentiment")
+        qa_cols = {k.replace('qa_', '').replace('_mean','').capitalize():v for k,v in selected_features.items() if 'qa_' in k}
+        qa_df = pd.DataFrame.from_dict(qa_cols, orient='index', columns=['Mean Score'])
+        st.bar_chart(qa_df)
+
+    if model_results:
+        st.header("Predictive Model Performance (XGBoost)")
+        st.info(message)
+        st.subheader("Top 10 Most Predictive Features")
+        st.bar_chart(model_results['feature_importance'].head(10))
