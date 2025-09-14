@@ -21,7 +21,7 @@ from finance.processor import (
 )
 from finance.analysis import run_prediction_model
 
-# --- Configuration and Model Loading ---
+# Configuration and Model Loading
 
 # Set page configuration
 st.set_page_config(
@@ -91,7 +91,7 @@ def main():
     elif choice == "About":
         render_about_page()
 
-# --- Page 1: Original Emotion Analyzer ---
+# Page 1: Original Emotion Analyzer
 
 def render_emotion_analyzer():
     st.title("General Emotion Analyzer")
@@ -140,7 +140,7 @@ def get_general_prediction_proba(docx, model, tokenizer):
         logits = model(**inputs).logits
     return torch.nn.functional.softmax(logits, dim=1).numpy()
 
-# --- Page 2: New Financial Analyzer ---
+# Page 2: New Financial Analyzer 
 
 @st.cache_data
 def run_full_finance_pipeline():
@@ -220,4 +220,4 @@ def render_financial_analyzer():
         st.subheader("Top 10 Most Predictive Features")
         st.bar_chart(model_results['feature_importance'].head(10))
 
-# --- Page 3: About Page ---
+# Page 3: About Page 
