@@ -221,3 +221,16 @@ def render_financial_analyzer():
         st.bar_chart(model_results['feature_importance'].head(10))
 
 # Page 3: About Page 
+
+def render_about_page():
+    st.header("About SentText")
+    st.markdown("""
+    This application contains two distinct analysis tools.
+
+    **Emotion Analyzer:** A general-purpose tool that classifies any text into one of eight granular emotions. It is powered by a fine-tuned DistilBERT model, ideal for understanding the emotional tone of reviews, social media posts, or personal messages.
+
+    **Financial Analysis:** A specialized tool designed to analyze the sentiment of corporate earnings calls and test its correlation with stock price performance. It uses a FinBERT model, fine-tuned for emotion analysis, to extract nuanced sentiment features from both the prepared remarks and the analyst Q&A sections of a transcript. An XGBoost model then attempts to predict post-earnings stock returns based on these advanced linguistic features.
+    """)
+
+if __name__ == '__main__':
+    main()
