@@ -105,10 +105,7 @@ def main():
     print(f"Training complete. Saving final model to '{output_dir}'...")
     trainer.save_model(output_dir)
     tokenizer.save_pretrained(output_dir)
-    print("-----" * 10)
-    print("SUCCESS: Model saved to your Google Drive in the 'Colab_Data' folder.")
-    print("You can now download the 'finbert_emotion_model' folder and place it in your project's 'finance/' directory.")
-    print("-----" * 10)
+    print("Model and tokenizer saved successfully.")
 
 if __name__ == "__main__":
     main()
