@@ -10,6 +10,11 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from streamlit_option_menu import option_menu
 import os
 import plotly.express as px
+import sys
+
+PROJECT_ROOT = r"C:\Users\anime\OneDrive\Desktop\Sentiment-Analysis-App"
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 # This brings in the logic from your new 'finance' directory
 from finance.processor import (
