@@ -27,19 +27,19 @@ def compute_metrics(p):
 
 def main():
     """Main function to load data, fine-tune the FinBERT model, and save it."""
-    # --- 1. Define Paths for Colab Environment ---
-    # This path points directly to the file inside your Google Drive
-    data_path = "/content/drive/MyDrive/Colab_Data/emotion_dataset.csv"
-    # This is where the final trained model will be saved in your Google Drive
-    output_dir = "/content/drive/MyDrive/Colab_Data/finbert_emotion_model"
+    # --- 1. Define Paths for Colab's Temporary Session Storage ---
+    # This path points to the file you just uploaded.
+    data_path = "/content/emotion_dataset.csv"
+    # The final model will be saved here, in the temporary storage.
+    output_dir = "/content/finbert_emotion_model"
     
     # --- 2. Load and Prepare the Dataset ---
     print(f"Loading dataset from: {data_path}")
     try:
         df = pd.read_csv(data_path)
     except FileNotFoundError:
-        print("ERROR: 'emotion_dataset.csv' not found in '/content/drive/MyDrive/Colab_Data/'.")
-        print("Please make sure you have uploaded the file to the correct Google Drive folder.")
+        print("ERROR: 'emotion_dataset.csv' not found in the Colab session storage.")
+        print("Please make sure you have uploaded the file using the folder icon on the left.")
         return
 
     print("Dataset loaded successfully. Preprocessing data...")
@@ -83,7 +83,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=1,
-        per_device_train_batch_size=16,  # Safe batch size for Colab GPU
+        per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         logging_steps=100,
         evaluation_strategy="epoch",
