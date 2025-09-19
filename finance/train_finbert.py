@@ -27,7 +27,6 @@ def compute_metrics(p):
 
 def main():
     """Main function to load data, fine-tune the FinBERT model, and save it."""
-    # --- 1. Define Paths for Colab's Temporary Session Storage ---
     # This path points to the file you just uploaded.
     data_path = "/content/emotion_dataset.csv"
     # The final model will be saved here, in the temporary storage.
@@ -59,7 +58,7 @@ def main():
 
     # --- 3. Load Tokenizer and Model ---
     print("Loading FinBERT tokenizer and model...")
-    model_name = "ProsusAI/finbert"
+    model_name = 'yiyanghkust/finbert-pretrai'
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -82,12 +81,12 @@ def main():
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        num_train_epochs=1,
+        num_train_epochs=3,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
         logging_steps=100,
         evaluation_strategy="epoch",
-        save_strategy="epoch",
+        save_strategy="no",
         load_best_model_at_end=True,
     )
 
