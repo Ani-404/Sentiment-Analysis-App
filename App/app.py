@@ -12,19 +12,22 @@ import os
 import plotly.express as px
 import sys
 
+print('Starting App...')
+
 PROJECT_ROOT = r"C:\Users\anime\OneDrive\Desktop\Sentiment-Analysis-App"
+# This block adds your project folder to Python's search path so it can find 'finance'.
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-# This brings in the logic from your new 'finance' directory
+# --- Import New Finance Modules ---
+# This will now work correctly because of the path correction above.
 from finance.processor import (
-    ingest_transcripts,
-    preprocess_and_split,
-    get_sentiment_vectors,
-    aggregate_vectors_to_features,
-    get_stock_returns
+    get_huggingface_sentiment,
+    get_twitter_credentials,
+    get_twitter_data,
 )
-from finance.analysis import run_prediction_model
+from finance.modeling_analysis import run_prediction_model
+
 
 # Configuration and Model Loading
 
@@ -38,35 +41,28 @@ st.set_page_config(
 
 @st.cache_resource
 def load_models():
-    """
-    Loads both the general emotion model and the fine-tuned financial model.
-    This function will be run only once.
-    """
+    """Loads both models using the hardcoded project root path."""
     models = {}
     try:
-        # --- Determine Project Root Correctly ---
-        # This handles running the script from 'App/' or the project's root directory
-        app_dir = os.path.dirname(os.path.abspath(__file__))
-        if os.path.basename(app_dir) == 'App':
-            project_root = os.path.dirname(app_dir)
-        else:
-            project_root = app_dir
-
-        # --- Load General Emotion Model (for the first tab) ---
-        general_model_path = os.path.join(project_root, "Models", "sentiment_model_distilbert")
+        # --- Load General Emotion Model ---
+        # This path is for the "Emotion Analyzer" tab.
+        # It should point to your trained DistilBERT model.
+        general_model_path = os.path.join(PROJECT_ROOT, "Models", "sentiment_model_distilbert")
         st.info(f"Loading general model from: {general_model_path}")
         models['general_tokenizer'] = AutoTokenizer.from_pretrained(general_model_path)
         models['general_model'] = AutoModelForSequenceClassification.from_pretrained(general_model_path)
         
-        # --- Load Fine-Tuned Financial Model (for the second tab) ---
-        finbert_path = os.path.join(project_root, "finance", "finbert_emotion_model")
+        # --- Load Fine-Tuned Financial Model ---
+        # This path is for the "Financial Analysis" tab.
+        # It should point to your final, high-accuracy model (e.g., finbert_large_emotion_model).
+        finbert_path = os.path.join(PROJECT_ROOT, "finance", "finbert_large_emotion_model") 
         st.info(f"Loading financial model from: {finbert_path}")
         if os.path.exists(finbert_path):
             models['finbert_tokenizer'] = AutoTokenizer.from_pretrained(finbert_path)
             models['finbert_model'] = AutoModelForSequenceClassification.from_pretrained(finbert_path)
         else:
-            # Display a warning if the financial model hasn't been trained yet
-            st.sidebar.warning("Fine-tuned FinBERT model not found. Please run `python finance/train_finbert.py` from your project root.")
+            # This warning will appear if the folder is not found
+            st.sidebar.warning("Fine-tuned FinBERT model not found. Please run the training script.")
             models['finbert_tokenizer'] = None
             models['finbert_model'] = None
 
@@ -74,7 +70,6 @@ def load_models():
         st.error(f"Error loading models: {e}")
         return None
     return models
-
 # Load all models at startup
 models = load_models()
 
@@ -156,7 +151,7 @@ def run_full_finance_pipeline():
     finbert_model = models['finbert_model']
     finbert_tokenizer = models['finbert_tokenizer']
     
-    df_transcripts = ingest_transcripts()
+    df_transcripts = ingest_transcripts(PROJECT_ROOT)
     all_features = []
 
     for _, row in df_transcripts.iterrows():
@@ -239,3 +234,5 @@ def render_about_page():
 
 if __name__ == '__main__':
     main()
+
+print("App loaded successfully.")
