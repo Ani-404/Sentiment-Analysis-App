@@ -43,6 +43,43 @@ EMOTION_EMOJIS = {
     "neutral": "😐", "sadness": "😔", "shame": "😳", "surprise": "😮"
 }
 
+# Add this after your imports but before load_models()
+@st.cache_data
+def ensure_models_downloaded():
+    """Auto-download models from HuggingFace if they don't exist locally"""
+    from huggingface_hub import snapshot_download
+    import shutil
+    import os
+    
+    emotion_dir = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
+    finbert_dir = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
+    
+    try:
+        # Download emotion model if missing
+        if not emotion_dir.exists() or not (emotion_dir / "model.safetensors").exists():
+            st.info("Downloading emotion model from HuggingFace...")
+            temp_dir = snapshot_download("YOUR_USERNAME/emotion-model")
+            if emotion_dir.exists():
+                shutil.rmtree(emotion_dir)
+            emotion_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(temp_dir, emotion_dir)
+            st.success("✅ Emotion model downloaded!")
+        
+        # Download financial model if missing
+        if not finbert_dir.exists() or not (finbert_dir / "model.safetensors").exists():
+            st.info("Downloading financial model from HuggingFace...")
+            temp_dir = snapshot_download("YOUR_USERNAME/finbert-model")
+            if finbert_dir.exists():
+                shutil.rmtree(finbert_dir)
+            finbert_dir.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(temp_dir, finbert_dir)
+            st.success("Financial model downloaded!")
+            
+    except Exception as e:
+        st.warning(f"Could not download models: {e}. Using fallback models.")
+        
+ensure_models_downloaded()
+
 @st.cache_resource
 def load_models():
     """Load both emotion and financial models with fallbacks"""
@@ -54,9 +91,9 @@ def load_models():
         if emotion_model_path.exists():
             models['general_tokenizer'] = AutoTokenizer.from_pretrained(str(emotion_model_path))
             models['general_model'] = AutoModelForSequenceClassification.from_pretrained(str(emotion_model_path))
-            st.sidebar.success("✅ Emotion model loaded")
+            st.sidebar.success("Emotion model loaded")
         else:
-            st.sidebar.warning("⚠️ Emotion model not found - using demo mode")
+            st.sidebar.warning("Emotion model not found - using demo mode")
             models['general_tokenizer'] = None
             models['general_model'] = None
 
@@ -65,14 +102,14 @@ def load_models():
         if finbert_path.exists():
             models['finbert_tokenizer'] = AutoTokenizer.from_pretrained(str(finbert_path))
             models['finbert_model'] = AutoModelForSequenceClassification.from_pretrained(str(finbert_path))
-            st.sidebar.success("✅ FinBERT model loaded")
+            st.sidebar.success("FinBERT model loaded")
         else:
-            st.sidebar.warning("⚠️ FinBERT model not found - using demo mode")
+            st.sidebar.warning("FinBERT model not found - using demo mode")
             models['finbert_tokenizer'] = None
             models['finbert_model'] = None
 
     except Exception as e:
-        st.sidebar.error(f"❌ Error loading models: {e}")
+        st.sidebar.error(f"Error loading models: {e}")
         return None
 
     return models
