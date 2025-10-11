@@ -24,6 +24,7 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
+from huggingface_hub import snapshot_download
 
 # Get project root dynamically (no hardcoded paths!)
 PROJECT_ROOT = Path(__file__).parent
@@ -43,42 +44,107 @@ EMOTION_EMOJIS = {
     "neutral": "😐", "sadness": "😔", "shame": "😳", "surprise": "😮"
 }
 
-# Ensuring before loading models
-@st.cache_data
-def ensure_models_downloaded():
-    """Auto-download models from HuggingFace if they don't exist locally"""
-    from huggingface_hub import snapshot_download
-    import shutil
-    import os
-    
+import threading
+import shutil
+import time
+
+# Global download status tracking
+if 'models_downloading' not in st.session_state:
+    st.session_state.models_downloading = False
+if 'models_ready' not in st.session_state:
+    st.session_state.models_ready = False
+if 'download_progress' not in st.session_state:
+    st.session_state.download_progress = ""
+if 'download_error' not in st.session_state:
+    st.session_state.download_error = None
+
+def download_models_background():
+    """Download models in background thread - doesn't block app startup"""
+    try:
+        emotion_dir = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
+        finbert_dir = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
+        
+        # Download emotion model
+        if not emotion_dir.exists() or not (emotion_dir / "model.safetensors").exists():
+            st.session_state.download_progress = "📥 Downloading emotion model..."
+            temp_dir = snapshot_download("Ani-404/emotion-model")
+            emotion_dir.parent.mkdir(parents=True, exist_ok=True)
+            if emotion_dir.exists():
+                shutil.rmtree(emotion_dir)
+            shutil.move(temp_dir, emotion_dir)
+        
+        # Download financial model
+        if not finbert_dir.exists() or not (finbert_dir / "model.safetensors").exists():
+            st.session_state.download_progress = "📥 Downloading financial model..."
+            temp_dir = snapshot_download("Ani-404/finbert-model")
+            finbert_dir.parent.mkdir(parents=True, exist_ok=True)
+            if finbert_dir.exists():
+                shutil.rmtree(finbert_dir)
+            shutil.move(temp_dir, finbert_dir)
+        
+        # Success!
+        st.session_state.download_progress = "✅ Your trained models are now ready!"
+        st.session_state.models_ready = True
+        st.session_state.models_downloading = False
+        
+    except Exception as e:
+        st.session_state.download_error = str(e)
+        st.session_state.download_progress = f"❌ Download failed: {str(e)[:100]}"
+        st.session_state.models_downloading = False
+
+
+def check_and_start_download():
+    """Check if models exist, start background download if needed"""
     emotion_dir = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
     finbert_dir = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
     
-    try:
-        # Download emotion model if missing
-        if not emotion_dir.exists() or not (emotion_dir / "model.safetensors").exists():
-            st.info("Downloading emotion model from HuggingFace...")
-            temp_dir = snapshot_download("Ani-404/emotion-model")
-            if emotion_dir.exists():
-                shutil.rmtree(emotion_dir)
-            emotion_dir.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(temp_dir, emotion_dir)
-            st.success("✅ Emotion model downloaded!")
+    # Check if models already exist
+    emotion_exists = emotion_dir.exists() and (emotion_dir / "model.safetensors").exists()
+    finbert_exists = finbert_dir.exists() and (finbert_dir / "model.safetensors").exists()
+    
+    if emotion_exists and finbert_exists:
+        st.session_state.models_ready = True
+        st.session_state.download_progress = "✅ Your trained models are ready!"
+        return
+    
+    # Start download in background if not already downloading
+    if not st.session_state.models_downloading and not st.session_state.models_ready:
+        st.session_state.models_downloading = True
+        st.session_state.download_progress = "🚀 Starting model download..."
         
-        # Download financial model if missing
-        if not finbert_dir.exists() or not (finbert_dir / "model.safetensors").exists():
-            st.info("Downloading financial model from HuggingFace...")
-            temp_dir = snapshot_download("Ani-404/finbert-model")
-            if finbert_dir.exists():
-                shutil.rmtree(finbert_dir)
-            finbert_dir.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(temp_dir, finbert_dir)
-            st.success("Financial model downloaded!")
-            
-    except Exception as e:
-        st.warning(f"Could not download models: {e}. Using fallback models.")
+        # Start background thread (daemon=True means it won't block app shutdown)
+        download_thread = threading.Thread(target=download_models_background, daemon=True)
+        download_thread.start()
+
+
+def show_download_status():
+    """Show download status without blocking the app"""
+    if st.session_state.models_downloading:
+        # Show progress WITHOUT sleep/rerun (these block the app)
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info(f"🔄 {st.session_state.download_progress}")
+        with col2:
+            if st.button("🔄 Refresh Status"):
+                st.rerun()
         
-ensure_models_downloaded()
+        st.info("💡 **App is fully functional** with high-quality fallback models!")
+        st.caption("⏱️ Downloads happen in background. Click refresh to check progress.")
+        
+    elif st.session_state.models_ready:
+        st.success("🎉 **Upgrade Complete!** Now using your trained models.")
+        
+    elif st.session_state.download_error:
+        st.warning(f"⚠️ Download issue: {st.session_state.download_error[:100]}")
+        st.info("📊 **App running perfectly** with professional fallback models.")
+        
+    else:
+        st.info("🚀 **App ready!** Using high-quality fallback models.")
+
+
+check_and_start_download()
+show_download_status()
+
 
 @st.cache_resource
 def load_models():
