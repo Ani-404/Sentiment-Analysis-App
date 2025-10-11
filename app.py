@@ -43,7 +43,7 @@ EMOTION_EMOJIS = {
     "neutral": "😐", "sadness": "😔", "shame": "😳", "surprise": "😮"
 }
 
-# Add this after your imports but before load_models()
+# Ensuring before loading models
 @st.cache_data
 def ensure_models_downloaded():
     """Auto-download models from HuggingFace if they don't exist locally"""
@@ -58,7 +58,7 @@ def ensure_models_downloaded():
         # Download emotion model if missing
         if not emotion_dir.exists() or not (emotion_dir / "model.safetensors").exists():
             st.info("Downloading emotion model from HuggingFace...")
-            temp_dir = snapshot_download("YOUR_USERNAME/emotion-model")
+            temp_dir = snapshot_download("Ani-404/emotion-model")
             if emotion_dir.exists():
                 shutil.rmtree(emotion_dir)
             emotion_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,7 @@ def ensure_models_downloaded():
         # Download financial model if missing
         if not finbert_dir.exists() or not (finbert_dir / "model.safetensors").exists():
             st.info("Downloading financial model from HuggingFace...")
-            temp_dir = snapshot_download("YOUR_USERNAME/finbert-model")
+            temp_dir = snapshot_download("Ani-404/finbert-model")
             if finbert_dir.exists():
                 shutil.rmtree(finbert_dir)
             finbert_dir.parent.mkdir(parents=True, exist_ok=True)
