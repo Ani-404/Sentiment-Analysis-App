@@ -17,6 +17,8 @@ import torch
 import plotly.express as px
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from streamlit_option_menu import option_menu
+from huggingface_hub import InferenceClient
+import requests
 import os
 import sys
 from pathlib import Path
@@ -24,7 +26,7 @@ import yfinance as yf
 from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
-from huggingface_hub import snapshot_download
+
 
 # Get project root dynamically (no hardcoded paths!)
 PROJECT_ROOT = Path(__file__).parent
@@ -44,141 +46,41 @@ EMOTION_EMOJIS = {
     "neutral": "😐", "sadness": "😔", "shame": "😳", "surprise": "😮"
 }
 
-import threading
-import shutil
-import time
+# HuggingFace Inference API Setup
+HF_TOKEN = st.secrets.get("HF_TOKEN") 
 
-# Global download status tracking
-if 'models_downloading' not in st.session_state:
-    st.session_state.models_downloading = False
-if 'models_ready' not in st.session_state:
-    st.session_state.models_ready = False
-if 'download_progress' not in st.session_state:
-    st.session_state.download_progress = ""
-if 'download_error' not in st.session_state:
-    st.session_state.download_error = None
-
-def download_models_background():
-    """Download models in background thread - doesn't block app startup"""
+@st.cache_resource
+def get_inference_clients():
+    """Initialize HuggingFace Inference clients"""
     try:
-        emotion_dir = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
-        finbert_dir = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
-        
-        # Download emotion model
-        if not emotion_dir.exists() or not (emotion_dir / "model.safetensors").exists():
-            st.session_state.download_progress = "📥 Downloading emotion model..."
-            temp_dir = snapshot_download("Ani-404/emotion-model")
-            emotion_dir.parent.mkdir(parents=True, exist_ok=True)
-            if emotion_dir.exists():
-                shutil.rmtree(emotion_dir)
-            shutil.move(temp_dir, emotion_dir)
-        
-        # Download financial model
-        if not finbert_dir.exists() or not (finbert_dir / "model.safetensors").exists():
-            st.session_state.download_progress = "📥 Downloading financial model..."
-            temp_dir = snapshot_download("Ani-404/finbert-model")
-            finbert_dir.parent.mkdir(parents=True, exist_ok=True)
-            if finbert_dir.exists():
-                shutil.rmtree(finbert_dir)
-            shutil.move(temp_dir, finbert_dir)
-        
-        # Success!
-        st.session_state.download_progress = "✅ Your trained models are now ready!"
-        st.session_state.models_ready = True
-        st.session_state.models_downloading = False
-        
-    except Exception as e:
-        st.session_state.download_error = str(e)
-        st.session_state.download_progress = f"❌ Download failed: {str(e)[:100]}"
-        st.session_state.models_downloading = False
+        emotion_client = InferenceClient(
+            model="Ani-404/emotion-model",  # Your actual model name
+            token=HF_TOKEN
+        )
+        finbert_client = InferenceClient(
+            model="Ani-404/finbert-model",  # Your actual model name  
+            token=HF_TOKEN
+        )
+        return emotion_client, finbert_client
+    except:
+        return None, None
 
-
-def check_and_start_download():
-    """Check if models exist, start background download if needed"""
-    emotion_dir = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
-    finbert_dir = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
-    
-    # Check if models already exist
-    emotion_exists = emotion_dir.exists() and (emotion_dir / "model.safetensors").exists()
-    finbert_exists = finbert_dir.exists() and (finbert_dir / "model.safetensors").exists()
-    
-    if emotion_exists and finbert_exists:
-        st.session_state.models_ready = True
-        st.session_state.download_progress = "✅ Your trained models are ready!"
-        return
-    
-    # Start download in background if not already downloading
-    if not st.session_state.models_downloading and not st.session_state.models_ready:
-        st.session_state.models_downloading = True
-        st.session_state.download_progress = "🚀 Starting model download..."
-        
-        # Start background thread (daemon=True means it won't block app shutdown)
-        download_thread = threading.Thread(target=download_models_background, daemon=True)
-        download_thread.start()
-
-
-def show_download_status():
-    """Show download status without blocking the app"""
-    if st.session_state.models_downloading:
-        # Show progress WITHOUT sleep/rerun (these block the app)
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.info(f"🔄 {st.session_state.download_progress}")
-        with col2:
-            if st.button("🔄 Refresh Status"):
-                st.rerun()
-        
-        st.info("💡 **App is fully functional** with high-quality fallback models!")
-        st.caption("⏱️ Downloads happen in background. Click refresh to check progress.")
-        
-    elif st.session_state.models_ready:
-        st.success("🎉 **Upgrade Complete!** Now using your trained models.")
-        
-    elif st.session_state.download_error:
-        st.warning(f"⚠️ Download issue: {st.session_state.download_error[:100]}")
-        st.info("📊 **App running perfectly** with professional fallback models.")
-        
-    else:
-        st.info("🚀 **App ready!** Using high-quality fallback models.")
-
-
-check_and_start_download()
-show_download_status()
+emotion_client, finbert_client = get_inference_clients()
 
 
 @st.cache_resource
 def load_models():
-    """Load both emotion and financial models with fallbacks"""
+    """Check if HF Inference API is available"""
     models = {}
-
-    try:
-        # Load General Emotion Model (existing path)
-        emotion_model_path = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
-        if emotion_model_path.exists():
-            models['general_tokenizer'] = AutoTokenizer.from_pretrained(str(emotion_model_path))
-            models['general_model'] = AutoModelForSequenceClassification.from_pretrained(str(emotion_model_path))
-            st.sidebar.success("Emotion model loaded")
-        else:
-            st.sidebar.warning("Emotion model not found - using demo mode")
-            models['general_tokenizer'] = None
-            models['general_model'] = None
-
-        # Load Financial Model (existing path)  
-        finbert_path = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
-        if finbert_path.exists():
-            models['finbert_tokenizer'] = AutoTokenizer.from_pretrained(str(finbert_path))
-            models['finbert_model'] = AutoModelForSequenceClassification.from_pretrained(str(finbert_path))
-            st.sidebar.success("FinBERT model loaded")
-        else:
-            st.sidebar.warning("FinBERT model not found - using demo mode")
-            models['finbert_tokenizer'] = None
-            models['finbert_model'] = None
-
-    except Exception as e:
-        st.sidebar.error(f"Error loading models: {e}")
+    
+    if emotion_client and finbert_client:
+        models['general_model'] = "hf_api"  
+        models['finbert_model'] = "hf_api"
+        st.sidebar.success("✅ Using your trained models via HuggingFace API")
+        return models
+    else:
+        st.sidebar.warning("⚠️ Using demo mode - add HF_TOKEN to secrets")
         return None
-
-    return models
 
 def predict_emotions_demo(text):
     """Demo emotion prediction using keyword analysis"""
@@ -213,33 +115,104 @@ def predict_emotions_demo(text):
     return emotion, confidence, probs
 
 def predict_emotions_real(text, model, tokenizer):
-    """Real emotion prediction using trained model"""
-    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-
-    with torch.no_grad():
-        outputs = model(**inputs)
-        predictions = torch.argmax(outputs.logits, dim=1)
-        probabilities = torch.nn.functional.softmax(outputs.logits, dim=1)
-
-    emotion = model.config.id2label[predictions.item()]
-    confidence = float(probabilities.max().item())
-    probs = probabilities.numpy()[0].tolist()
-
-    return emotion, confidence, probs
+    """Use HuggingFace Inference API for emotion prediction"""
+    try:
+        # Call your emotion model via API
+        response = emotion_client.text_classification(text)
+        
+        if response and len(response) > 0:
+            # Get top prediction
+            top_pred = max(response, key=lambda x: x['score'])
+            emotion = top_pred['label'].lower()
+            confidence = top_pred['score']
+            
+            # Create probability distribution 
+            emotion_labels = ['anger', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'shame', 'surprise']
+            probs = [0.1] * len(emotion_labels)  # Default small probabilities
+            
+            # Set the predicted emotion's probability
+            if emotion in emotion_labels:
+                idx = emotion_labels.index(emotion)
+                probs[idx] = confidence
+            
+            return emotion, confidence, probs
+        else:
+            # Fallback to demo mode
+            return predict_emotions_demo(text)
+            
+    except Exception as e:
+        st.error(f"API Error: {e}")
+        return predict_emotions_demo(text)
 
 def analyze_financial_sentiment(text, ticker=None):
-    """Analyze financial sentiment with trading signal"""
+    """Use HuggingFace Inference API for financial sentiment"""
     if not text.strip():
         return None
+        
+    try:
+        # Call your finbert model via API
+        response = finbert_client.text_classification(text)
+        
+        if response and len(response) > 0:
+            top_pred = max(response, key=lambda x: x['score'])
+            label = top_pred['label'].lower()
+            confidence = top_pred['score']
+            
+            # Map to trading signals
+            if label == 'positive':
+                signal = "BUY" if confidence > 0.7 else "HOLD"
+                sentiment_score = confidence
+            elif label == 'negative':
+                signal = "SELL" if confidence > 0.7 else "HOLD"
+                sentiment_score = -confidence
+            else:
+                signal = "HOLD"
+                sentiment_score = 0.0
+                
+        else:
+            # Fallback to keyword analysis
+            return analyze_financial_sentiment_demo(text, ticker)
+            
+    except Exception as e:
+        st.error(f"Financial API Error: {e}")
+        return analyze_financial_sentiment_demo(text, ticker)
+    
+    # Get stock data if ticker provided
+    stock_data = None
+    if ticker:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="5d")
+            if len(hist) >= 2:
+                recent_change = ((hist['Close'][-1] - hist['Close'][-2]) / hist['Close'][-2]) * 100
+                stock_data = {
+                    'ticker': ticker,
+                    'price': hist['Close'][-1],
+                    'change': recent_change
+                }
+        except Exception as e:
+            st.warning(f"Could not fetch stock data for {ticker}: {e}")
+    
+    return {
+        'sentiment_score': sentiment_score,
+        'signal': signal,
+        'confidence': confidence,
+        'stock_data': stock_data,
+        'positive_ratio': max(0, sentiment_score),
+        'negative_ratio': max(0, -sentiment_score),
+        'neutral_ratio': 1 - abs(sentiment_score)
+    }
 
-    # Simple keyword-based analysis 
+def analyze_financial_sentiment_demo(text, ticker=None):
+    """Original keyword-based analysis as fallback"""
+    # Your existing keyword analysis code here
     text_lower = text.lower()
     positive_words = ['growth', 'profit', 'exceeded', 'strong', 'robust', 'expansion', 'record', 'beat', 'success', 'revenue']
     negative_words = ['decline', 'loss', 'weak', 'concern', 'challenge', 'disruption', 'headwinds', 'drop', 'fall', 'miss']
-
+    
     pos_count = sum(1 for word in positive_words if word in text_lower)
     neg_count = sum(1 for word in negative_words if word in text_lower)
-
+    
     if pos_count > neg_count:
         sentiment_score = 0.3 + (pos_count - neg_count) * 0.15
         signal = "BUY" if sentiment_score > 0.5 else "HOLD"
@@ -249,18 +222,17 @@ def analyze_financial_sentiment(text, ticker=None):
     else:
         sentiment_score = 0.0
         signal = "HOLD"
-
-    # Clamp between -1 and 1
+    
     sentiment_score = max(-1.0, min(1.0, sentiment_score))
-
-    # Get stock data if ticker provided
+    
+    # Get stock data
     stock_data = None
     if ticker:
         try:
             stock = yf.Ticker(ticker)
             hist = stock.history(period="5d")
             if len(hist) >= 2:
-                recent_change = (hist['Close'][-1] - hist['Close'][-2]) / hist['Close'][-2] * 100
+                recent_change = ((hist['Close'][-1] - hist['Close'][-2]) / hist['Close'][-2]) * 100
                 stock_data = {
                     'ticker': ticker,
                     'price': hist['Close'][-1],
@@ -268,7 +240,7 @@ def analyze_financial_sentiment(text, ticker=None):
                 }
         except Exception as e:
             st.warning(f"Could not fetch stock data for {ticker}: {e}")
-
+    
     return {
         'sentiment_score': sentiment_score,
         'signal': signal,
