@@ -15,7 +15,6 @@ import pandas as pd
 import numpy as np
 import torch
 import plotly.express as px
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from streamlit_option_menu import option_menu
 from huggingface_hub import InferenceClient
 import requests
@@ -49,16 +48,18 @@ EMOTION_EMOJIS = {
 # HuggingFace Inference API Setup
 HF_TOKEN = st.secrets.get("HF_TOKEN") 
 
+# HuggingFace Inference API Setup
 @st.cache_resource
 def get_inference_clients():
     """Initialize HuggingFace Inference clients"""
     try:
+        HF_TOKEN = st.secrets.get("HF_TOKEN")
         emotion_client = InferenceClient(
-            model="Ani-404/emotion-model",  # Your actual model name
+            model="Ani-404/emotion-model",
             token=HF_TOKEN
         )
         finbert_client = InferenceClient(
-            model="Ani-404/finbert-model",  # Your actual model name  
+            model="Ani-404/finbert-model", 
             token=HF_TOKEN
         )
         return emotion_client, finbert_client
