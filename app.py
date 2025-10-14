@@ -68,20 +68,98 @@ def get_inference_clients():
 
 emotion_client, finbert_client = get_inference_clients()
 
+@st.cache_resource
+def get_runtime_mode():
+    """Get HF API clients and mode flag."""
+    HF_TOKEN = st.secrets.get("HF_TOKEN")
+    try:
+        emotion_client = InferenceClient(
+            model="Ani-404/emotion-model",
+            token=HF_TOKEN
+        )
+        fin_client = InferenceClient(
+            model="Ani-404/finbert-model",
+            token=HF_TOKEN
+        )
+        # Try to touch API
+        _ = emotion_client.text_classification("API connectivity test.", wait_for_model=False)
+        _ = fin_client.text_classification("API test.", wait_for_model=False)
+        return {"mode": "hf_api", "emotion_client": emotion_client, "fin_client": fin_client}
+    except Exception as e:
+        st.sidebar.warning(f"Using local/demo: {e}")
+        return {"mode": "local", "emotion_client": None, "fin_client": None}
+
 
 @st.cache_resource
+@st.cache_resource
 def load_models():
-    """Check if HF Inference API is available"""
-    models = {}
-    
-    if emotion_client and finbert_client:
-        models['general_model'] = "hf_api"  
-        models['finbert_model'] = "hf_api"
-        st.sidebar.success("✅ Using your trained models via HuggingFace API")
-        return models
-    else:
-        st.sidebar.warning("⚠️ Using demo mode - add HF_TOKEN to secrets")
-        return None
+    models = get_runtime_mode()
+    try:
+        # Load local model and tokenizer if they exist
+        emotion_path = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
+        if emotion_path.exists():
+            models['general_tokenizer'] = AutoTokenizer.from_pretrained(str(emotion_path))
+            models['general_model'] = AutoModelForSequenceClassification.from_pretrained(str(emotion_path))
+        else:
+            models['general_tokenizer'] = None
+            models['general_model'] = None
+        fin_path = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
+        if fin_path.exists():
+            models['finbert_tokenizer'] = AutoTokenizer.from_pretrained(str(fin_path))
+            models['finbert_model'] = AutoModelForSequenceClassification.from_pretrained(str(fin_path))
+        else:
+            models['finbert_tokenizer'] = None
+            models['finbert_model'] = None
+    except Exception as e:
+        models['general_tokenizer'] = models['general_model'] = None
+        models['finbert_tokenizer'] = models['finbert_model'] = None
+        st.sidebar.warning("Local models unavailable.")
+    return models
+
+def predict_emotions_api(text, emotion_client):
+    try:
+        resp = emotion_client.text_classification(text, wait_for_model=True)
+        if not resp:
+            return predict_emotions_demo(text)
+        top = max(resp, key=lambda x: x['score'])
+        label = top['label'].lower()
+        conf = top['score']
+        possible = ['anger', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'shame', 'surprise']
+        probs = [0.05] * len(possible)
+        if label in possible:
+            probs[possible.index(label)] = conf
+        return label, conf, probs
+    except Exception:
+        return predict_emotions_demo(text)
+
+def analyze_financial_api(text, fin_client, ticker=None):
+    try:
+        resp = fin_client.text_classification(text, wait_for_model=True)
+        if not resp:
+            return analyze_financial_sentiment_demo(text, ticker)
+        top = max(resp, key=lambda x: x['score'])
+        label = top['label'].lower()
+        conf = top['score']
+        if label == 'positive':
+            signal = "BUY" if conf > 0.7 else "HOLD"
+            score = conf
+        elif label == 'negative':
+            signal = "SELL" if conf > 0.7 else "HOLD"
+            score = -conf
+        else:
+            signal = "HOLD"
+            score = 0.0
+        return {
+            'sentiment_score': score,
+            'signal': signal,
+            'confidence': conf,
+            'stock_data': None,
+            'positive_ratio': max(0, score),
+            'negative_ratio': max(0, -score),
+            'neutral_ratio': 1 - abs(score),
+        }
+    except Exception:
+        return analyze_financial_sentiment_demo(text, ticker)
 
 def predict_emotions_demo(text):
     """Demo emotion prediction using keyword analysis"""
@@ -288,12 +366,15 @@ def render_emotion_analyzer(models):
     if st.button("🔍 Analyze Emotions", type="primary", disabled=not raw_text.strip()):
         with st.spinner("Analyzing emotions..."):
             # Use real model if available, otherwise demo mode
-            if models and models.get('general_model'):
+            if models.get('mode') == 'hf_api':
+                emotion, confidence, probs = predict_emotions_api(raw_text, models['emotion_client'])
+                model_status = "Using HuggingFace API model"
+            elif models.get('general_model') is not None and models.get('general_tokenizer') is not None:
                 emotion, confidence, probs = predict_emotions_real(raw_text, models['general_model'], models['general_tokenizer'])
-                model_status = "Using trained model"
+                model_status = "Using local trained model"
             else:
                 emotion, confidence, probs = predict_emotions_demo(raw_text)
-                model_status = "Using demo mode (keyword-based)"
+                model_status = "Using demo model"
 
         # Display results
         st.success("🎯 Analysis Complete!")
@@ -396,7 +477,13 @@ def render_financial_analyzer(models):
     # Analysis button
     if st.button("🔍 Analyze Financial Sentiment", type="primary", disabled=not financial_text.strip()):
         with st.spinner("Analyzing financial sentiment..."):
-            result = analyze_financial_sentiment(financial_text, ticker)
+            if models.get('mode') == 'hf_api':
+                result = analyze_financial_api(financial_text, models['fin_client'], ticker)
+                # unpack result as needed
+            elif models.get('finbert_model') is not None and models.get('finbert_tokenizer') is not None:
+                result = analyze_financial_sentiment(financial_text, models['finbert_model'], models['finbert_tokenizer'], ticker)
+            else:
+                result = analyze_financial_sentiment_demo(financial_text, ticker)
 
         if result:
             st.success("🎯 Analysis Complete!")
