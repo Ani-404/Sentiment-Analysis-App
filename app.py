@@ -46,7 +46,7 @@ EMOTION_EMOJIS = {
 }
 
 # HuggingFace Inference API Setup
-HF_TOKEN = st.secrets.get("HF_TOKEN") 
+HF_TOKEN = st.secrets.get("HF_TOKEN", None)
 
 # HuggingFace Inference API Setup
 @st.cache_resource
@@ -71,7 +71,13 @@ emotion_client, finbert_client = get_inference_clients()
 @st.cache_resource
 def get_runtime_mode():
     """Get HF API clients and mode flag."""
-    HF_TOKEN = st.secrets.get("HF_TOKEN")
+    HF_TOKEN = st.secrets.get("HF_TOKEN", None)
+    
+    # Skip HF API if no token
+    if not HF_TOKEN:
+        st.sidebar.info("💡 Running in local/demo mode (no HF_TOKEN found)")
+        return {"mode": "local", "emotion_client": None, "fin_client": None}
+    
     try:
         emotion_client = InferenceClient(
             model="Ani-404/emotion-model",
@@ -81,14 +87,10 @@ def get_runtime_mode():
             model="Ani-404/finbert-model",
             token=HF_TOKEN
         )
-        # Try to touch API
-        _ = emotion_client.text_classification("API connectivity test.", wait_for_model=False)
-        _ = fin_client.text_classification("API test.", wait_for_model=False)
         return {"mode": "hf_api", "emotion_client": emotion_client, "fin_client": fin_client}
     except Exception as e:
         st.sidebar.warning(f"Using local/demo: {e}")
         return {"mode": "local", "emotion_client": None, "fin_client": None}
-
 
 @st.cache_resource
 @st.cache_resource
