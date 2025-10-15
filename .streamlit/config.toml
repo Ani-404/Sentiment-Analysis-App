@@ -6,5 +6,6 @@ secondaryBackgroundColor = "#262730"
 textColor = "#fafafa"
 
 [server]
-headless = true
+address = "127.0.0.1"
 port = 8501
+headless = false
