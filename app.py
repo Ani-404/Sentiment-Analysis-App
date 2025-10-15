@@ -16,7 +16,6 @@ import numpy as np
 import torch
 import plotly.express as px
 from streamlit_option_menu import option_menu
-from huggingface_hub import InferenceClient
 import requests
 import os
 import sys
@@ -44,124 +43,133 @@ EMOTION_EMOJIS = {
     "anger": "😠", "disgust": "🤮", "fear": "😨", "joy": "😂", 
     "neutral": "😐", "sadness": "😔", "shame": "😳", "surprise": "😮"
 }
+# DEBUG: Add this temporarily to check token
+HF_TOKEN = st.secrets.get("HF_TOKEN", None) if st.secrets else os.getenv("HF_TOKEN", None)
+if HF_TOKEN:
+    st.sidebar.success(f"✅ HF_TOKEN found: {HF_TOKEN[:8]}...")
+else:
+    st.sidebar.error("❌ No HF_TOKEN found - will use demo mode")
 
-# HuggingFace Inference API Setup
-HF_TOKEN = st.secrets.get("HF_TOKEN", None)
-
-# HuggingFace Inference API Setup
-@st.cache_resource
-def get_inference_clients():
-    """Initialize HuggingFace Inference clients"""
-    try:
-        HF_TOKEN = st.secrets.get("HF_TOKEN")
-        emotion_client = InferenceClient(
-            model="Ani-404/emotion-model",
-            token=HF_TOKEN
-        )
-        finbert_client = InferenceClient(
-            model="Ani-404/finbert-model", 
-            token=HF_TOKEN
-        )
-        return emotion_client, finbert_client
-    except:
-        return None, None
-
-emotion_client, finbert_client = get_inference_clients()
+HF_TOKEN = os.getenv("HF_TOKEN", None)
 
 @st.cache_resource
 def get_runtime_mode():
-    """Get HF API clients and mode flag."""
-    HF_TOKEN = st.secrets.get("HF_TOKEN", None)
-    
-    # Skip HF API if no token
-    if not HF_TOKEN:
-        st.sidebar.info("💡 Running in local/demo mode (no HF_TOKEN found)")
-        return {"mode": "local", "emotion_client": None, "fin_client": None}
-    
+    """
+    Robust token resolution and HF client init.
+    Checks Streamlit secrets first, then multiple common env var names.
+    Returns dict with mode and clients.
+    """
+    # 1) Find token (st.secrets preferred)
+    token = None
     try:
-        emotion_client = InferenceClient(
-            model="Ani-404/emotion-model",
-            token=HF_TOKEN
-        )
-        fin_client = InferenceClient(
-            model="Ani-404/finbert-model",
-            token=HF_TOKEN
-        )
-        return {"mode": "hf_api", "emotion_client": emotion_client, "fin_client": fin_client}
-    except Exception as e:
-        st.sidebar.warning(f"Using local/demo: {e}")
-        return {"mode": "local", "emotion_client": None, "fin_client": None}
+        if st.secrets and st.secrets.get("HF_TOKEN"):
+            token = st.secrets.get("HF_TOKEN")
+    except Exception:
+        token = None
 
-@st.cache_resource
+    # 2) Fallback to environment variables (check common names)
+    if not token:
+        token = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACEHUB_API_TOKEN") or os.getenv("HUGGINGFACE_TOKEN")
+
+    if not token:
+        st.sidebar.info("💡 No Hugging Face token found (st.secrets['HF_TOKEN'] or HUGGINGFACEHUB_API_TOKEN). Using demo mode.")
+        return {"mode": "demo", "emotion_client": None, "fin_client": None}
+
+    # 3) Try creating clients and show helpful error if it fails
+    try:
+        ec = InferenceClient(model="Ani-404/emotion-model", token=token)
+        fc = InferenceClient(model="Ani-404/finbert-model", token=token)
+        st.sidebar.success("✅ Using Hugging Face models via API")
+        return {"mode": "hf_api", "emotion_client": ec, "fin_client": fc}
+    except Exception as e:
+        # Surface the exception (shortened) so you can debug token/model issues
+        st.sidebar.error(f"HF API init failed — falling back to demo. Error: {str(e)[:200]}")
+        return {"mode": "demo", "emotion_client": None, "fin_client": None}
+
 @st.cache_resource
 def load_models():
-    models = get_runtime_mode()
-    try:
-        # Load local model and tokenizer if they exist
-        emotion_path = PROJECT_ROOT / "Models" / "sentiment_model_distilbert"
-        if emotion_path.exists():
-            models['general_tokenizer'] = AutoTokenizer.from_pretrained(str(emotion_path))
-            models['general_model'] = AutoModelForSequenceClassification.from_pretrained(str(emotion_path))
-        else:
-            models['general_tokenizer'] = None
-            models['general_model'] = None
-        fin_path = PROJECT_ROOT / "finance" / "finbert_large_emotion_model"
-        if fin_path.exists():
-            models['finbert_tokenizer'] = AutoTokenizer.from_pretrained(str(fin_path))
-            models['finbert_model'] = AutoModelForSequenceClassification.from_pretrained(str(fin_path))
-        else:
-            models['finbert_tokenizer'] = None
-            models['finbert_model'] = None
-    except Exception as e:
-        models['general_tokenizer'] = models['general_model'] = None
-        models['finbert_tokenizer'] = models['finbert_model'] = None
-        st.sidebar.warning("Local models unavailable.")
-    return models
+    return get_runtime_mode()
 
 def predict_emotions_api(text, emotion_client):
-    try:
-        resp = emotion_client.text_classification(text, wait_for_model=True)
-        if not resp:
-            return predict_emotions_demo(text)
-        top = max(resp, key=lambda x: x['score'])
-        label = top['label'].lower()
-        conf = top['score']
-        possible = ['anger', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'shame', 'surprise']
-        probs = [0.05] * len(possible)
-        if label in possible:
-            probs[possible.index(label)] = conf
-        return label, conf, probs
-    except Exception:
+    """Call HF Inference API for emotion classification without unsupported kwargs."""
+    st.sidebar.info(f"🔍 HF API call, text length {len(text)}")
+
+    if not emotion_client:
+        st.sidebar.warning("❗ No HF emotion_client, using demo model")
         return predict_emotions_demo(text)
 
-def analyze_financial_api(text, fin_client, ticker=None):
     try:
-        resp = fin_client.text_classification(text, wait_for_model=True)
-        if not resp:
-            return analyze_financial_sentiment_demo(text, ticker)
-        top = max(resp, key=lambda x: x['score'])
-        label = top['label'].lower()
-        conf = top['score']
-        if label == 'positive':
-            signal = "BUY" if conf > 0.7 else "HOLD"
-            score = conf
-        elif label == 'negative':
-            signal = "SELL" if conf > 0.7 else "HOLD"
-            score = -conf
+        # Pass text only; remove wait_for_model
+        response = emotion_client.text_classification(text)
+        
+        if not response or not isinstance(response, list):
+            st.sidebar.warning("⚠️ HF API returned no results, falling back to demo")
+            return predict_emotions_demo(text)
+
+        top = max(response, key=lambda x: x.get("score", 0))
+        label = top.get("label", "neutral").lower()
+        score = top.get("score", 0.0)
+        st.sidebar.success(f"✅ HF API emotion: {label} ({score:.2f})")
+        return label, score, None
+
+    except Exception as e:
+        st.sidebar.error(f"❌ HF API error (emotion): {repr(e)}")
+        return predict_emotions_demo(text)
+    
+def analyze_financial_api(text, fin_client, ticker=None):
+    """
+    Call HF Inference API for financial sentiment.
+    Removes unsupported kwarg and retries if model is loading.
+    """
+    import time
+    try:
+        resp = fin_client.text_classification(text)  # remove wait_for_model
+    except Exception as e:
+        err = str(e)
+        if "Model is currently loading" in err or "503" in err or "Service Unavailable" in err:
+            retries = 5
+            delay = 2
+            resp = None
+            for i in range(retries):
+                time.sleep(delay)
+                try:
+                    resp = fin_client.text_classification(text)
+                    break
+                except Exception:
+                    resp = None
+            if resp is None:
+                st.sidebar.error(f"HF API error (finance): {err[:200]}")
+                return analyze_financial_sentiment_demo(text, ticker)
         else:
-            signal = "HOLD"
-            score = 0.0
-        return {
-            'sentiment_score': score,
-            'signal': signal,
-            'confidence': conf,
-            'stock_data': None,
-            'positive_ratio': max(0, score),
-            'negative_ratio': max(0, -score),
-            'neutral_ratio': 1 - abs(score),
-        }
-    except Exception:
+            st.sidebar.error(f"HF API error (finance): {err[:200]}")
+            return analyze_financial_sentiment_demo(text, ticker)
+
+    if not resp:
         return analyze_financial_sentiment_demo(text, ticker)
+
+    top = max(resp, key=lambda x: x.get('score', 0.0))
+    label = top.get('label', 'neutral').lower()
+    conf = float(top.get('score', 0.0))
+
+    if label == 'positive':
+        signal = "BUY" if conf > 0.7 else "HOLD"
+        score = conf
+    elif label == 'negative':
+        signal = "SELL" if conf > 0.7 else "HOLD"
+        score = -conf
+    else:
+        signal = "HOLD"
+        score = 0.0
+
+    return {
+        'sentiment_score': score,
+        'signal': signal,
+        'confidence': conf,
+        'stock_data': None,
+        'positive_ratio': max(0, score),
+        'negative_ratio': max(0, -score),
+        'neutral_ratio': 1 - abs(score),
+    }
 
 def predict_emotions_demo(text):
     """Demo emotion prediction using keyword analysis"""
@@ -194,95 +202,6 @@ def predict_emotions_demo(text):
         probs = [0.1, 0.1, 0.1, 0.1, 0.70, 0.1, 0.1, 0.1]  # neutral highest
 
     return emotion, confidence, probs
-
-def predict_emotions_real(text, model, tokenizer):
-    """Use HuggingFace Inference API for emotion prediction"""
-    try:
-        # Call your emotion model via API
-        response = emotion_client.text_classification(text)
-        
-        if response and len(response) > 0:
-            # Get top prediction
-            top_pred = max(response, key=lambda x: x['score'])
-            emotion = top_pred['label'].lower()
-            confidence = top_pred['score']
-            
-            # Create probability distribution 
-            emotion_labels = ['anger', 'disgust', 'fear', 'joy', 'neutral', 'sadness', 'shame', 'surprise']
-            probs = [0.1] * len(emotion_labels)  # Default small probabilities
-            
-            # Set the predicted emotion's probability
-            if emotion in emotion_labels:
-                idx = emotion_labels.index(emotion)
-                probs[idx] = confidence
-            
-            return emotion, confidence, probs
-        else:
-            # Fallback to demo mode
-            return predict_emotions_demo(text)
-            
-    except Exception as e:
-        st.error(f"API Error: {e}")
-        return predict_emotions_demo(text)
-
-def analyze_financial_sentiment(text, ticker=None):
-    """Use HuggingFace Inference API for financial sentiment"""
-    if not text.strip():
-        return None
-        
-    try:
-        # Call your finbert model via API
-        response = finbert_client.text_classification(text)
-        
-        if response and len(response) > 0:
-            top_pred = max(response, key=lambda x: x['score'])
-            label = top_pred['label'].lower()
-            confidence = top_pred['score']
-            
-            # Map to trading signals
-            if label == 'positive':
-                signal = "BUY" if confidence > 0.7 else "HOLD"
-                sentiment_score = confidence
-            elif label == 'negative':
-                signal = "SELL" if confidence > 0.7 else "HOLD"
-                sentiment_score = -confidence
-            else:
-                signal = "HOLD"
-                sentiment_score = 0.0
-                
-        else:
-            # Fallback to keyword analysis
-            return analyze_financial_sentiment_demo(text, ticker)
-            
-    except Exception as e:
-        st.error(f"Financial API Error: {e}")
-        return analyze_financial_sentiment_demo(text, ticker)
-    
-    # Get stock data if ticker provided
-    stock_data = None
-    if ticker:
-        try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="5d")
-            if len(hist) >= 2:
-                recent_change = ((hist['Close'][-1] - hist['Close'][-2]) / hist['Close'][-2]) * 100
-                stock_data = {
-                    'ticker': ticker,
-                    'price': hist['Close'][-1],
-                    'change': recent_change
-                }
-        except Exception as e:
-            st.warning(f"Could not fetch stock data for {ticker}: {e}")
-    
-    return {
-        'sentiment_score': sentiment_score,
-        'signal': signal,
-        'confidence': confidence,
-        'stock_data': stock_data,
-        'positive_ratio': max(0, sentiment_score),
-        'negative_ratio': max(0, -sentiment_score),
-        'neutral_ratio': 1 - abs(sentiment_score)
-    }
 
 def analyze_financial_sentiment_demo(text, ticker=None):
     """Original keyword-based analysis as fallback"""
@@ -370,10 +289,7 @@ def render_emotion_analyzer(models):
             # Use real model if available, otherwise demo mode
             if models.get('mode') == 'hf_api':
                 emotion, confidence, probs = predict_emotions_api(raw_text, models['emotion_client'])
-                model_status = "Using HuggingFace API model"
-            elif models.get('general_model') is not None and models.get('general_tokenizer') is not None:
-                emotion, confidence, probs = predict_emotions_real(raw_text, models['general_model'], models['general_tokenizer'])
-                model_status = "Using local trained model"
+                model_status = "Using your trained model via HF API ⚡"
             else:
                 emotion, confidence, probs = predict_emotions_demo(raw_text)
                 model_status = "Using demo model"
@@ -481,11 +397,10 @@ def render_financial_analyzer(models):
         with st.spinner("Analyzing financial sentiment..."):
             if models.get('mode') == 'hf_api':
                 result = analyze_financial_api(financial_text, models['fin_client'], ticker)
-                # unpack result as needed
-            elif models.get('finbert_model') is not None and models.get('finbert_tokenizer') is not None:
-                result = analyze_financial_sentiment(financial_text, models['finbert_model'], models['finbert_tokenizer'], ticker)
+                model_status = "Using your trained FinBERT via HF API ⚡"
             else:
                 result = analyze_financial_sentiment_demo(financial_text, ticker)
+                model_status = "Using demo model"
 
         if result:
             st.success("🎯 Analysis Complete!")
@@ -672,9 +587,9 @@ def main():
         device = "GPU (CUDA)" if torch.cuda.is_available() else "CPU"
         st.info(f"**Device:** {device}")
 
-        if models:
-            emotion_status = "✅ Loaded" if models.get('general_model') else "⚠️ Demo Mode"
-            finbert_status = "✅ Loaded" if models.get('finbert_model') else "⚠️ Demo Mode"
+        if models["mode"]=="hf_api":
+            emotion_status = "✅ Connected" if models.get('emotion_client') else "⚠️ Not connected"
+            finbert_status = "✅ Connected" if models.get('fin_client') else "⚠️ Not connected"
             st.info(f"**Emotion Model:** {emotion_status}")
             st.info(f"**FinBERT Model:** {finbert_status}")
 
