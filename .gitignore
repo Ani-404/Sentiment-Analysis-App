@@ -80,3 +80,4 @@ checkpoint-*/
 
 # Data files (if they are large)
 # *.csv
+.streamlit/secrets.toml

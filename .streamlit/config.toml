@@ -8,4 +8,4 @@ textColor = "#fafafa"
 [server]
 headless = true
 address = "0.0.0.0"
-port = ${PORT}
+port = 8501
