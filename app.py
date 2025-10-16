@@ -1,10 +1,15 @@
+import os
+import tempfile
+
+# Fix Streamlit permissions issue on HF Spaces
+os.environ["STREAMLIT_CONFIG_DIR"] = tempfile.mkdtemp()
+
 import streamlit as st
 from transformers import pipeline
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import yfinance as yf
-import os
 import warnings
 warnings.filterwarnings('ignore')
 
