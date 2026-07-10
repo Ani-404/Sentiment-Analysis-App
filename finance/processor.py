@@ -12,13 +12,10 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# Financial sentiment model. Defaults to a public model so the pipeline runs
-# out-of-the-box; set FINANCIAL_MODEL to use a custom/gated model (e.g.
-# "Ani-404/finbert-model") once authenticated via `huggingface-cli login`.
-MODEL_NAME = os.getenv(
-    "FINANCIAL_MODEL",
-    "mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis",
-)
+# Financial sentiment model. Defaults to the project's fine-tuned model
+# (gated on HF, so needs an authorized token or the repo ungated). Override
+# with FINANCIAL_MODEL to point at a different/public model.
+MODEL_NAME = os.getenv("FINANCIAL_MODEL", "Ani-404/finbert-model")
 
 
 @lru_cache(maxsize=1)

@@ -13,11 +13,11 @@ import yfinance as yf
 import warnings
 warnings.filterwarnings('ignore')
 
-# Model IDs default to public models so the app runs out-of-the-box.
-# Override with env vars to use custom/gated models (e.g. "Ani-404/emotion-model",
-# "Ani-404/finbert-model") after `huggingface-cli login` with an authorized token.
-EMOTION_MODEL = os.getenv("EMOTION_MODEL", "bhadresh-savani/distilbert-base-uncased-emotion")
-FINANCIAL_MODEL = os.getenv("FINANCIAL_MODEL", "mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis")
+# Defaults to the project's own fine-tuned models. emotion-model is public;
+# finbert-model is gated, so a public deployment needs either the repo ungated
+# or an authorized HF_TOKEN available to the server. Override via env vars.
+EMOTION_MODEL = os.getenv("EMOTION_MODEL", "Ani-404/emotion-model")
+FINANCIAL_MODEL = os.getenv("FINANCIAL_MODEL", "Ani-404/finbert-model")
 
 # Configure page
 st.set_page_config(
