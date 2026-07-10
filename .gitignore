@@ -66,6 +66,7 @@ sentiment-env/
 
 # --- Machine Learning Specific ---
 # Trained models
+models/
 finbert_large_emotion_model/
 sentiment_model_tiny/
 sentiment_model_distilbert/
