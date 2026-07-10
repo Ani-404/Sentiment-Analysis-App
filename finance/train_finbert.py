@@ -1,92 +1,114 @@
 # train_finbert.py
-# This script trains a FinBERT model for financial sentiment analysis
+# Fine-tunes a FinBERT model for emotion/financial sentiment classification.
+#
+# Run from the project root, e.g.:
+#     python -m finance.train_finbert --data Data/emotion_dataset.csv --output finbert_emotion_model
 
-print("Starting FinBERT training script...")
+import argparse
 
+import numpy as np
 import pandas as pd
-import torch
+from datasets import Dataset
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from transformers import (
-    AutoTokenizer,
     AutoModelForSequenceClassification,
+    AutoTokenizer,
     Trainer,
-    TrainingArguments
+    TrainingArguments,
 )
-from datasets import Dataset
-import numpy as np
-from sklearn.metrics import accuracy_score, f1_score
-import os
+
 
 def compute_metrics(p):
-    """Computes and returns evaluation metrics."""
+    """Compute accuracy and weighted F1."""
     preds = np.argmax(p.predictions, axis=1)
-    f1 = f1_score(p.label_ids, preds, average='weighted', zero_division=0)
+    f1 = f1_score(p.label_ids, preds, average="weighted", zero_division=0)
     acc = accuracy_score(p.label_ids, preds)
     return {"accuracy": acc, "f1": f1}
 
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Fine-tune FinBERT for sentiment.")
+    parser.add_argument(
+        "--data",
+        default="Data/emotion_dataset.csv",
+        help="Path to the training CSV (needs Text/Clean_Text and Emotion columns).",
+    )
+    parser.add_argument(
+        "--output",
+        default="finbert_emotion_model",
+        help="Directory to save the fine-tuned model.",
+    )
+    parser.add_argument(
+        "--model-name",
+        default="yiyanghkust/finbert-pretrain",
+        help="Base model to fine-tune.",
+    )
+    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--max-length", type=int, default=128)
+    return parser.parse_args()
+
+
 def main():
-    """Main function to load data, fine-tune the FinBERT model, and save it."""
-    # This path points to the file you just uploaded.
-    data_path = "/content/emotion_dataset.csv"
-    # The final model will be saved here, in the temporary storage.
-    output_dir = "/content/finbert_emotion_model"
-    
-    # --- 2. Load and Prepare the Dataset ---
-    print(f"Loading dataset from: {data_path}")
+    args = parse_args()
+
+    print(f"Loading dataset from: {args.data}")
     try:
-        df = pd.read_csv(data_path)
+        df = pd.read_csv(args.data)
     except FileNotFoundError:
-        print("ERROR: 'emotion_dataset.csv' not found in the Colab session storage.")
-        print("Please make sure you have uploaded the file using the folder icon on the left.")
+        print(f"ERROR: '{args.data}' not found.")
         return
 
     print("Dataset loaded successfully. Preprocessing data...")
-    df['text'] = df['Clean_Text'].fillna(df['Text'])
-    df.dropna(subset=['text', 'Emotion'], inplace=True)
-    
+    df["text"] = df["Clean_Text"].fillna(df["Text"]) if "Clean_Text" in df else df["Text"]
+    df.dropna(subset=["text", "Emotion"], inplace=True)
+
     label_encoder = LabelEncoder()
-    df['labels'] = label_encoder.fit_transform(df['Emotion'])
+    df["labels"] = label_encoder.fit_transform(df["Emotion"])
     num_labels = len(label_encoder.classes_)
     id2label = {i: label for i, label in enumerate(label_encoder.classes_)}
     label2id = {label: i for i, label in enumerate(label_encoder.classes_)}
-    
+
     print(f"Found {num_labels} unique emotions.")
-    train_df, val_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['labels'])
+    train_df, val_df = train_test_split(
+        df, test_size=0.2, random_state=42, stratify=df["labels"]
+    )
     train_dataset = Dataset.from_pandas(train_df)
     val_dataset = Dataset.from_pandas(val_df)
 
-    # --- 3. Load Tokenizer and Model ---
     print("Loading FinBERT tokenizer and model...")
-    model_name = 'yiyanghkust/finbert-pretrai'
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     model = AutoModelForSequenceClassification.from_pretrained(
-        model_name,
+        args.model_name,
         num_labels=num_labels,
         id2label=id2label,
         label2id=label2id,
-        ignore_mismatched_sizes=True # ESSENTIAL for transfer learning
+        ignore_mismatched_sizes=True,  # ESSENTIAL for transfer learning
     )
-    
+
     def tokenize_function(examples):
-        return tokenizer(examples['text'], padding="max_length", truncation=True, max_length=128)
+        return tokenizer(
+            examples["text"],
+            padding="max_length",
+            truncation=True,
+            max_length=args.max_length,
+        )
 
     tokenized_train_dataset = train_dataset.map(tokenize_function, batched=True)
     tokenized_val_dataset = val_dataset.map(tokenize_function, batched=True)
 
-    # --- 4. Fine-Tune the Model ---
-    print("Starting model fine-tuning...")
-    print(f"Model will be saved to: {output_dir}")
-
+    print(f"Starting model fine-tuning... (output: {args.output})")
     training_args = TrainingArguments(
-        output_dir=output_dir,
-        num_train_epochs=3,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        output_dir=args.output,
+        num_train_epochs=args.epochs,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
         logging_steps=100,
-        evaluation_strategy="epoch",
-        save_strategy="no",
+        eval_strategy="epoch",
+        save_strategy="epoch",
+        save_total_limit=1,
         load_best_model_at_end=True,
     )
 
@@ -100,11 +122,11 @@ def main():
 
     trainer.train()
 
-    # --- 5. Save the Final Model ---
-    print(f"Training complete. Saving final model to '{output_dir}'...")
-    trainer.save_model(output_dir)
-    tokenizer.save_pretrained(output_dir)
+    print(f"Training complete. Saving final model to '{args.output}'...")
+    trainer.save_model(args.output)
+    tokenizer.save_pretrained(args.output)
     print("Model and tokenizer saved successfully.")
+
 
 if __name__ == "__main__":
     main()

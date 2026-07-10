@@ -13,6 +13,12 @@ import yfinance as yf
 import warnings
 warnings.filterwarnings('ignore')
 
+# Model IDs default to public models so the app runs out-of-the-box.
+# Override with env vars to use custom/gated models (e.g. "Ani-404/emotion-model",
+# "Ani-404/finbert-model") after `huggingface-cli login` with an authorized token.
+EMOTION_MODEL = os.getenv("EMOTION_MODEL", "bhadresh-savani/distilbert-base-uncased-emotion")
+FINANCIAL_MODEL = os.getenv("FINANCIAL_MODEL", "mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis")
+
 # Configure page
 st.set_page_config(
     page_title="SentText - Advanced Analysis",
@@ -25,27 +31,23 @@ st.set_page_config(
 @st.cache_resource
 def load_models():
     models = {}
-    try:
-        # Remove use_auth_token, rely on environment login
-        models['emotion'] = pipeline(
-            "text-classification",
-            model="Ani-404/emotion-model",
-            tokenizer="Ani-404/emotion-model"
-        )
-        models['financial'] = pipeline(
-            "text-classification", 
-            model="Ani-404/finbert-model",
-            tokenizer="Ani-404/finbert-model"
-        )
-    except Exception:
-        models = {}
-    return models
+    errors = {}
+    for key, model_id in (('emotion', EMOTION_MODEL), ('financial', FINANCIAL_MODEL)):
+        try:
+            models[key] = pipeline(
+                "text-classification",
+                model=model_id,
+                tokenizer=model_id,
+            )
+        except Exception as exc:
+            errors[key] = f"{model_id}: {exc}"
+    return models, errors
 
 # Prediction functions
 
 def predict_emotions_real(text, model):
-    results = model(text, return_all_scores=True)
-    scores_list = results[0]
+    results = model(text, top_k=None)
+    scores_list = results[0] if results and isinstance(results[0], list) else results
     top = max(scores_list, key=lambda x: x['score'])
     return top['label'].lower(), top['score']
 
@@ -69,7 +71,12 @@ def analyze_financial_real(text, model):
 
 def main():
     st.title("SentText Analytics")
-    models = load_models()
+    models, errors = load_models()
+    if errors:
+        with st.sidebar:
+            st.warning("Some models failed to load:")
+            for key, msg in errors.items():
+                st.caption(f"{key}: {msg}")
     tabs = st.tabs(["🎭 Emotion Analysis", "📈 Financial Analysis"])
 
     # Emotion
