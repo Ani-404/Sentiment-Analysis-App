@@ -1,0 +1,6 @@
+# Extra dependencies for the offline finance pipeline (finance/run_pipeline.py)
+# and model training (finance/train_finbert.py). Not needed by the deployed app.
+-r requirements.txt
+scikit-learn>=1.3.0
+xgboost>=1.7.0
+datasets>=2.14.0

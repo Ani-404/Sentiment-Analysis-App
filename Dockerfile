@@ -8,9 +8,12 @@ ENV STREAMLIT_CONFIG_DIR=/tmp/.streamlit
 ENV TRANSFORMERS_CACHE=/tmp/.cache
 ENV HF_HOME=/tmp/.cache/huggingface
 
-# Copy requirements and install dependencies
+# Copy requirements and install dependencies.
+# Install CPU-only torch first (Spaces are CPU); avoids pulling multi-GB CUDA
+# wheels that overflow the build disk.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY . .
