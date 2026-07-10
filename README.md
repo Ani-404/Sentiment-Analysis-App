@@ -1,3 +1,13 @@
+---
+title: SenText
+emoji: 📈
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Sentiment Analysis App
 
 ![Streamlit](https://img.shields.io/badge/Streamlit-%23FF4B4B?logo=streamlit&logoColor=white)
@@ -17,8 +27,9 @@ Market language is different: the same phrase can mean different things in finan
 
 ---
 
-## Quick visual 
-![Demo](assets/demo.gif)  
+## Live demo
+
+Deployed on Hugging Face Spaces: https://huggingface.co/spaces/Ani-404/sentext
 
 ---
 
