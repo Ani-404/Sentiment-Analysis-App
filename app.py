@@ -67,6 +67,12 @@ def analyze_financial_real(text, model):
         score = 0; signal='HOLD'
     return score, confidence, signal
 
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_price_history(ticker):
+    """Fetch 5-day price history; cached to reduce Yahoo rate-limiting."""
+    return yf.Ticker(ticker).history(period='5d')
+
 # Main UI
 
 def main():
@@ -94,13 +100,20 @@ def main():
         col1, col2 = st.columns([1,2])
         with col1:
             ticker = st.text_input("Ticker:", value='AAPL')
-            if st.button("Fetch Chart"):
-                df = yf.Ticker(ticker).history(period='5d')
-                if not df.empty:
-                    fig = px.line(df, y='Close', title=f"{ticker} Closing Prices (5d)")
+            if st.button("Fetch Chart") and ticker.strip():
+                try:
+                    df = fetch_price_history(ticker.strip().upper())
+                except Exception as exc:
+                    df = None
+                    if 'ratelimit' in type(exc).__name__.lower() or 'Too Many Requests' in str(exc):
+                        st.warning("Yahoo Finance is rate-limiting the server right now. Please try again in a minute.")
+                    else:
+                        st.error(f"Couldn't fetch price data: {type(exc).__name__}")
+                if df is not None and not df.empty:
+                    fig = px.line(df, y='Close', title=f"{ticker.upper()} Closing Prices (5d)")
                     st.plotly_chart(fig)
-                else:
-                    st.error("No data for ticker.")
+                elif df is not None:
+                    st.error("No data for that ticker.")
         with col2:
             fin_text = st.text_area("Enter financial text:")
             if st.button("Analyze Financial Sentiment") and fin_text:
