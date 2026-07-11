@@ -49,7 +49,12 @@ def predict_emotions_real(text, model):
     results = model(text, top_k=None)
     scores_list = results[0] if results and isinstance(results[0], list) else results
     top = max(scores_list, key=lambda x: x['score'])
-    return top['label'].lower(), top['score']
+    all_scores = sorted(
+        ({'emotion': r['label'].lower(), 'score': r['score']} for r in scores_list),
+        key=lambda x: x['score'],
+        reverse=True,
+    )
+    return top['label'].lower(), top['score'], all_scores
 
 
 def analyze_financial_real(text, model):
@@ -73,6 +78,25 @@ def fetch_price_history(ticker):
     """Fetch 5-day price history; cached to reduce Yahoo rate-limiting."""
     return yf.Ticker(ticker).history(period='5d')
 
+
+EMOTION_EMOJI = {
+    'joy': '😄', 'happy': '😄', 'happiness': '😄',
+    'sadness': '😢', 'sad': '😢',
+    'anger': '😠', 'angry': '😠',
+    'fear': '😨', 'surprise': '😲', 'surprised': '😲',
+    'disgust': '🤢', 'love': '❤️', 'neutral': '😐',
+}
+
+
+def emotion_emoji(label):
+    """Return an emoji for an emotion label, defaulting to a neutral face."""
+    return EMOTION_EMOJI.get(label.lower(), '🙂')
+
+
+def signal_color(signal):
+    """Return a Streamlit metric delta color hint for a trade signal."""
+    return {'BUY': 'normal', 'SELL': 'inverse', 'HOLD': 'off'}.get(signal, 'off')
+
 # Main UI
 
 def main():
@@ -90,8 +114,24 @@ def main():
         text = st.text_area("Enter text:")
         if st.button("Analyze Emotion") and text:
             if 'emotion' in models:
-                label, conf = predict_emotions_real(text, models['emotion'])
-                st.write(f"**Emotion**: {label} | **Confidence**: {conf:.1%}")
+                with st.spinner("Analyzing..."):
+                    label, conf, all_scores = predict_emotions_real(text, models['emotion'])
+                col_a, col_b = st.columns(2)
+                col_a.metric("Emotion", f"{emotion_emoji(label)} {label.title()}")
+                col_b.metric("Confidence", f"{conf:.1%}")
+
+                scores_df = pd.DataFrame(all_scores)
+                fig = px.bar(
+                    scores_df,
+                    x='score',
+                    y='emotion',
+                    orientation='h',
+                    title="Emotion confidence distribution",
+                    labels={'score': 'Confidence', 'emotion': ''},
+                )
+                fig.update_layout(yaxis={'categoryorder': 'total ascending'})
+                fig.update_xaxes(tickformat='.0%', range=[0, 1])
+                st.plotly_chart(fig, use_container_width=True)
             else:
                 st.error("Emotion model not loaded.")
 
@@ -118,9 +158,17 @@ def main():
             fin_text = st.text_area("Enter financial text:")
             if st.button("Analyze Financial Sentiment") and fin_text:
                 if 'financial' in models:
-                    score, conf, signal = analyze_financial_real(fin_text, models['financial'])
-                    st.write(f"**Sentiment Score**: {score:.2f} | **Confidence**: {conf:.1%}")
-                    st.write(f"**Signal**: {signal}")
+                    with st.spinner("Analyzing..."):
+                        score, conf, signal = analyze_financial_real(fin_text, models['financial'])
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("Sentiment Score", f"{score:+.2f}")
+                    m2.metric("Confidence", f"{conf:.1%}")
+                    m3.metric(
+                        "Signal",
+                        signal,
+                        delta=signal,
+                        delta_color=signal_color(signal),
+                    )
                 else:
                     st.error("Financial model not loaded.")
 
